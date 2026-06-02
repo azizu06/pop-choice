@@ -26,3 +26,9 @@ export type PrefFormProps = {
   isLast: boolean;
   prefIdx: number;
 };
+
+export type MoviePageProps = {
+  nextMovie: () => void;
+  isLast: boolean;
+  movie: Movie;
+};

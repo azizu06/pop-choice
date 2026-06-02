@@ -22,7 +22,19 @@ export default function Home() {
     if (nextIdx == session.peopleCount + 1) setStep("results");
   };
   const handleMovies = (data: Movie[]) => setRecs(data);
-  const nextMovie = () => setRecIdx((prev) => prev + 1);
+
+  const resetAll = () => {
+    setSession(null);
+    setPrefs([]);
+    setRecs([]);
+    setRecIdx(0);
+    setPrefIdx(0);
+    setStep("setup");
+  };
+  const nextMovie = () => {
+    if (recIdx == recs.length + 1) return resetAll();
+    setRecIdx((prev) => prev + 1);
+  };
   return (
     <>
       {step === "setup" && <SessionForm handleSubmit={handleSetup} />}
@@ -34,7 +46,11 @@ export default function Home() {
         />
       )}
       {step === "results" && (
-        <Movie nextMovie={nextMovie} movie={recs[recIdx]} />
+        <Movie
+          nextMovie={nextMovie}
+          movie={recs[recIdx]}
+          isLast={recs.length === recIdx}
+        />
       )}
     </>
   );
