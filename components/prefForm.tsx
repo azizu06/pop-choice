@@ -1,6 +1,13 @@
 import Image from "next/image";
 import Popcorn from "@/public/popcorn.png";
-import { PrefFormProps } from "../types";
+import { Preferences, PreferencesSchema } from "@/lib/schemas";
+
+export type PrefFormProps = {
+  handleSubmit: (data: Preferences) => void;
+  isLast: boolean;
+  prefIdx: number;
+};
+
 export default function PrefForm({
   handleSubmit,
   isLast,
@@ -10,14 +17,19 @@ export default function PrefForm({
   const moods = ["fun", "serious", "inspiring", "scary"];
   const onSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = e.currentTarget;
+    const formData = new FormData(e.currentTarget);
     const data = {
       favMovie: formData.get("favMovie"),
       era: formData.get("era"),
       mood: formData.get("mood"),
       favPerson: formData.get("favPerson"),
     };
-    handleSubmit(data);
+    const result = PreferencesSchema.safeParse(data);
+    if (!result.success) {
+      console.error(result.error);
+      return;
+    }
+    handleSubmit(result.data);
   };
   return (
     <div className="flex flex-col gap-2 justify-center">
@@ -59,7 +71,7 @@ export default function PrefForm({
           </label>
           <input type="text" name="favPerson" id="favPerson" required />
         </div>
-        <button type="submit">{isLast ? "Get Movie" : "Next Person"}</button>
+        <button type="submit">{isLast ? "Get Movies" : "Next Person"}</button>
       </form>
     </div>
   );

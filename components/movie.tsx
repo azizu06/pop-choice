@@ -1,5 +1,11 @@
 import Image from "next/image";
-import { MoviePageProps } from "../types";
+import { Movie } from "@/lib/schemas";
+export type MoviePageProps = {
+  nextMovie: () => void;
+  isLast: boolean;
+  movie: Movie;
+};
+
 export default function MoviePage({
   nextMovie,
   movie,
