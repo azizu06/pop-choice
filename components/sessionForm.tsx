@@ -1,16 +1,25 @@
 import Image from "next/image";
 import Popcorn from "@/public/popcorn.png";
-import { SessionFormProps } from "../types";
+import { Session, SessionSchema } from "@/lib/schemas";
+
+type SessionFormProps = {
+  handleSubmit: (data: Session) => void;
+};
 
 export default function SessionForm({ handleSubmit }: SessionFormProps) {
   const onSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = e.currentTarget;
+    const formData = new FormData(e.currentTarget);
     const data = {
       peopleCount: formData.get("people"),
       time: formData.get("time"),
     };
-    handleSubmit(data);
+    const result = SessionSchema.safeParse(data);
+    if (!result.success) {
+      console.error(result.error);
+      return;
+    }
+    handleSubmit(result.data);
   };
   return (
     <div className="flex flex-col gap-2 justify-center">

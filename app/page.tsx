@@ -1,14 +1,15 @@
 "use client";
 import { useState } from "react";
-import SessionForm from "./components/sessionForm";
-import PrefForm from "./components/prefForm";
-import { Session, Preferences, Movie } from "./types";
+import SessionForm from "@/components/sessionForm";
+import PrefForm from "@/components/prefForm";
+import MoviePage from "@/components/movie";
+import type { Preferences, Session, Movie } from "@/lib/schemas";
 export default function Home() {
   const [step, setStep] = useState("setup");
   const [session, setSession] = useState<Session | null>(null);
   const [prefs, setPrefs] = useState<Preferences[]>([]);
   const [recs, setRecs] = useState<Movie[]>([]);
-  const [prefIdx, setPrefIdx] = useState(0);
+  const [prefIdx, setPrefIdx] = useState(1);
   const [recIdx, setRecIdx] = useState(0);
   const handleSetup = (data: Session) => {
     setSession(data);
@@ -19,10 +20,9 @@ export default function Home() {
     const nextIdx = prefIdx + 1;
     setPrefs((prev) => [...prev, data]);
     setPrefIdx((prev) => prev + 1);
-    if (nextIdx == session.peopleCount + 1) setStep("results");
+    if (nextIdx == session.peopleCount) setStep("results");
   };
   const handleMovies = (data: Movie[]) => setRecs(data);
-
   const resetAll = () => {
     setSession(null);
     setPrefs([]);
@@ -32,7 +32,7 @@ export default function Home() {
     setStep("setup");
   };
   const nextMovie = () => {
-    if (recIdx == recs.length + 1) return resetAll();
+    if (recIdx == recs.length - 1) return resetAll();
     setRecIdx((prev) => prev + 1);
   };
   return (
@@ -46,10 +46,10 @@ export default function Home() {
         />
       )}
       {step === "results" && (
-        <Movie
+        <MoviePage
           nextMovie={nextMovie}
           movie={recs[recIdx]}
-          isLast={recs.length === recIdx}
+          isLast={recs.length - 1 === recIdx}
         />
       )}
     </>
