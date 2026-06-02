@@ -1,32 +1,8 @@
 import { openai } from "@/lib/openai";
 import { supabase } from "@/lib/supabase";
-
-const instructions = `
-  You are PopChoice, a thoughtful movie recommendation assistant.
-
-  Your job is to recommend movies based on a group's combined preferences and the retrieved movie context provided to you.
-
-  Use only the movie information included in the provided context. Do not invent movies, actors, ratings, plots, release years, or poster information. If the context does not contain enough information, say that the match is based on the closest available options.
-
-  When explaining recommendations:
-  - Explain why each movie fits the group's preferences.
-  - Mention specific signals from the user's preferences, such as mood, favorite movies, preferred era, available time, and people in the group.
-  - Keep the tone friendly, confident, and concise.
-  - Avoid generic phrases like "this movie has something for everyone" unless you explain why.
-  - Do not overstate certainty. Use language like "this seems like a strong fit" when appropriate.
-  - If there are tradeoffs, mention them briefly. For example, if a movie matches the mood but is longer than requested, say so.
-  - Do not include spoilers.
-  - Do not mention embeddings, vector search, retrieval, Supabase, OpenAI, or internal implementation details.
-
-  Format your answer as a ranked list of recommendations.
-
-  For each recommendation, include:
-  1. Movie title and release year
-  2. A short explanation of why it fits
-  3. A quick note about the vibe or best viewing situation
-
-  If multiple people gave preferences, balance the group as a whole instead   of optimizing for only one person.
-`;
+import type { MovieMatch, Preferences, Session, Movie } from "@/lib/schemas";
+import { instructions } from "@/lib/instructions";
+import { getPosterUrl } from "@/lib/tmdb";
 
 export const createEmbedding = async (input: string) => {
   const response = await openai.embeddings.create({
@@ -37,11 +13,12 @@ export const createEmbedding = async (input: string) => {
 };
 
 const findMatches = async (embedding: number[]) => {
-  const { data } = await supabase.rpc("match_popmovies", {
+  const { data, error } = await supabase.rpc("match_popmovies", {
     query_embedding: embedding,
     match_threshold: 0.3,
     match_count: 5,
   });
+  if (error) throw error;
   return data;
 };
 
@@ -53,4 +30,44 @@ const getChatCompletion = async (text: string, query: string) => {
     instructions,
   });
   return response.output_text;
+};
+
+export const getMovies = async (
+  session: Session,
+  prefs: Preferences[],
+): Promise<Movie[]> => {
+  const allPrefs = prefs
+    .map((p, i) => {
+      return `
+      Person ${i + 1}:
+      Favorite Movie - ${p.favMovie}
+      Movie Era - ${p.era}
+      Mood - ${p.mood}
+      Favorite Film Person - ${p.favPerson}
+    `;
+    })
+    .join("\n\n");
+  const input = `
+  Group has ${session.peopleCount} people and ${session.time} available.
+  ${allPrefs}
+  `;
+  const embedding = await createEmbedding(input);
+  try {
+    const matches = await findMatches(embedding);
+    if (!matches) return [];
+    const movies = await Promise.all(
+      matches.map(async (m: MovieMatch) => {
+        return {
+          title: m.title,
+          releaseYear: m.release_year,
+          posterUrl: await getPosterUrl(m.title, m.release_year),
+          explanation: await getChatCompletion(m.content, input),
+        };
+      }),
+    );
+    return movies;
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
 };

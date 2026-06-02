@@ -19,6 +19,14 @@ export type Preferences = z.infer<typeof PreferencesSchema>;
 export type Movie = {
   title: string;
   releaseYear: number;
-  posterUrl: string;
+  posterUrl: string | null;
   explanation: string;
+};
+
+export type MovieMatch = {
+  id: number;
+  title: string;
+  release_year: number;
+  content: string;
+  similarity: number;
 };
