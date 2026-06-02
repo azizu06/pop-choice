@@ -5,7 +5,7 @@ export type Session = {
 
 export type Preferences = {
   favMovie: string;
-  movieType: "new" | "classic";
+  era: "new" | "classic";
   mood: "fun" | "serious" | "inspiring" | "scary";
   favPerson: string;
 };
@@ -15,4 +15,14 @@ export type Movie = {
   releaseYear: number;
   posterUrl: string;
   explanation: string;
+};
+
+export type SessionFormProps = {
+  handleSubmit: (data: Session) => void;
+};
+
+export type PrefFormProps = {
+  handleSubmit: (data: Preferences) => void;
+  isLast: boolean;
+  prefIdx: number;
 };

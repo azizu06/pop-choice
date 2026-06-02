@@ -1,14 +1,24 @@
 import Image from "next/image";
 import Popcorn from "@/public/popcorn.png";
+import { SessionFormProps } from "../types";
 
-export default function StartForm({ handleSubmit }) {
+export default function SessionForm({ handleSubmit }: SessionFormProps) {
+  const onSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = e.currentTarget;
+    const data = {
+      peopleCount: formData.get("people"),
+      time: formData.get("time"),
+    };
+    handleSubmit(data);
+  };
   return (
     <div className="flex flex-col gap-2 justify-center">
       <div className="flex flex-col gap-1">
         <Image src={Popcorn} alt="popcorn" />
         <h1>PopChoice</h1>
       </div>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <form onSubmit={onSubmit} className="flex flex-col gap-2">
         <label htmlFor="people">
           <input
             type="number"
