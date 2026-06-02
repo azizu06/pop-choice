@@ -4,6 +4,7 @@ import SessionForm from "@/components/sessionForm";
 import PrefForm from "@/components/prefForm";
 import MoviePage from "@/components/movie";
 import type { Preferences, Session, Movie } from "@/lib/schemas";
+import { getMovies } from "@/lib/movieRecs";
 export default function Home() {
   const [step, setStep] = useState("setup");
   const [isPending, startTransition] = useTransition();
@@ -25,12 +26,11 @@ export default function Home() {
       return;
     }
     startTransition(async () => {
-      const movies = 
-    })
-    setRecs(movies)
-    setStep("results");
+      const movies = await getMovies(session, allPrefs);
+      setRecs(movies);
+      setStep("results");
+    });
   };
-  const handleMovies = (data: Movie[]) => setRecs(data);
   const resetAll = () => {
     setSession(null);
     setPrefs([]);
@@ -58,6 +58,7 @@ export default function Home() {
           nextMovie={nextMovie}
           movie={recs[recIdx]}
           isLast={recs.length - 1 === recIdx}
+          isPending={isPending}
         />
       )}
     </>
