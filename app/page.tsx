@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import SessionForm from "@/components/sessionForm";
 import PrefForm from "@/components/prefForm";
 import MoviePage from "@/components/movie";
 import type { Preferences, Session, Movie } from "@/lib/schemas";
 export default function Home() {
   const [step, setStep] = useState("setup");
+  const [isPending, startTransition] = useTransition();
   const [session, setSession] = useState<Session | null>(null);
   const [prefs, setPrefs] = useState<Preferences[]>([]);
   const [recs, setRecs] = useState<Movie[]>([]);
@@ -17,10 +18,17 @@ export default function Home() {
   };
   const handlePrefs = (data: Preferences) => {
     if (!session) return;
-    const nextIdx = prefIdx + 1;
-    setPrefs((prev) => [...prev, data]);
-    setPrefIdx((prev) => prev + 1);
-    if (nextIdx == session.peopleCount) setStep("results");
+    const allPrefs = [...prefs, data];
+    if (allPrefs.length !== session.peopleCount) {
+      setPrefs(allPrefs);
+      setPrefIdx((prev) => prev + 1);
+      return;
+    }
+    startTransition(async () => {
+      const movies = 
+    })
+    setRecs(movies)
+    setStep("results");
   };
   const handleMovies = (data: Movie[]) => setRecs(data);
   const resetAll = () => {
