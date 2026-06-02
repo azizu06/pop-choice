@@ -3,7 +3,7 @@ loadEnvConfig(process.cwd());
 import { readFile } from "node:fs/promises";
 import { supabase } from "@/lib/supabase";
 import { splitter } from "@/lib/splitter";
-import { createEmbedding } from "@/lib/helpers";
+import { createEmbedding } from "@/lib/movieRecs";
 
 const seedData = async (document: string) => {
   const data = await readFile(document, "utf-8");

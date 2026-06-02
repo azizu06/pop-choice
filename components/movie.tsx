@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Poster from "@/public/poster.png";
 import { Movie } from "@/lib/schemas";
 export type MoviePageProps = {
   nextMovie: () => void;
@@ -18,7 +19,12 @@ export default function MoviePage({
       <h1>
         {movie.title} ({movie.releaseYear})
       </h1>
-      <Image src={movie.posterUrl} alt="movie poster" />
+      <Image
+        src={movie.posterUrl ?? Poster}
+        alt={`${movie.title} poster`}
+        width={300}
+        height={450}
+      />
       <p>{movie.explanation}</p>
       <button onClick={() => nextMovie()}>
         {isPending
