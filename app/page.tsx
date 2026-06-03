@@ -44,7 +44,7 @@ export default function Home() {
     setRecIdx((prev) => prev + 1);
   };
   return (
-    <>
+    <main className="app-shell">
       {step === "setup" && <SessionForm handleSubmit={handleSetup} />}
       {step == "prefs" && (
         <PrefForm
@@ -61,6 +61,6 @@ export default function Home() {
           isPending={isPending}
         />
       )}
-    </>
+    </main>
   );
 }

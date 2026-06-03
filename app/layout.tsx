@@ -1,4 +1,16 @@
 import "./globals.css";
+import { Carter_One, Roboto_Slab } from "next/font/google";
+
+const carterOne = Carter_One({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-carter-one",
+});
+
+const robotoSlab = Roboto_Slab({
+  subsets: ["latin"],
+  variable: "--font-roboto-slab",
+});
 
 export default function RootLayout({
   children,
@@ -7,7 +19,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className={`${carterOne.variable} ${robotoSlab.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }
