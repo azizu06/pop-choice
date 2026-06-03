@@ -22,31 +22,35 @@ export default function SessionForm({ handleSubmit }: SessionFormProps) {
     handleSubmit(result.data);
   };
   return (
-    <div className="flex flex-col gap-2 justify-center">
-      <div className="flex flex-col gap-1">
-        <Image src={Popcorn} alt="popcorn" />
-        <h1>PopChoice</h1>
+    <div className="screen start-screen">
+      <div className="brand brand-start">
+        <Image src={Popcorn} alt="popcorn" className="popcorn-logo" priority />
+        <h1 className="app-title">PopChoice</h1>
       </div>
-      <form onSubmit={onSubmit} className="flex flex-col gap-2">
-        <label htmlFor="people">
+      <form onSubmit={onSubmit} className="start-form">
+        <label htmlFor="people" className="sr-only">
+          How many people?
+        </label>
           <input
+            className="form-control setup-control"
             type="number"
             name="people"
             id="people"
             placeholder="How many people?"
             required
           />
+        <label htmlFor="time" className="sr-only">
+          How much time do you have?
         </label>
-        <label htmlFor="time">
           <input
+            className="form-control setup-control"
             type="text"
             name="time"
             id="time"
             placeholder="How much time do you have?"
             required
           />
-        </label>
-        <button type="submit" className="p-2 flex justify-center rounded-lg">
+        <button type="submit" className="primary-button">
           Start
         </button>
       </form>

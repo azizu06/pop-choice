@@ -32,46 +32,58 @@ export default function PrefForm({
     handleSubmit(result.data);
   };
   return (
-    <div className="flex flex-col gap-2 justify-center">
-      <div className="flex flex-col gap-1 justify-center">
-        <Image src={Popcorn} alt="popcorn" />
-        <h1>{prefIdx}</h1>
+    <div className="screen prefs-screen">
+      <div className="brand brand-compact">
+        <Image src={Popcorn} alt="popcorn" className="popcorn-logo" priority />
+        <h1 className="person-count">{prefIdx}</h1>
       </div>
-      <form onSubmit={onSubmit} className="flex flex-col gap-2">
-        <div className="flex flex-col">
+      <form onSubmit={onSubmit} className="prefs-form">
+        <div className="question-block question-favorite">
           <label htmlFor="favMovie">What’s your favorite movie and why?</label>
-          <input type="text" name="favMovie" id="favMovie" required />
+          <textarea
+            className="form-control text-area text-area-tall"
+            name="favMovie"
+            id="favMovie"
+            required
+          />
         </div>
-        <div className="flex flex-col gap-1">
+        <fieldset className="question-block">
           <p>Are you in the mood for something new or a classic?</p>
-          <div className="flex gap-1">
+          <div className="pill-row">
             {types.map((t) => (
-              <div key={t}>
+              <div className="choice-pill" key={t}>
                 <input type="radio" name="era" id={t} required value={t} />
-                <label htmlFor={t}>{t.charAt(0).toUpperCase()}</label>
+                <label htmlFor={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</label>
               </div>
             ))}
           </div>
-        </div>
-        <div className="flex flex-col gap-1">
+        </fieldset>
+        <fieldset className="question-block">
           <p>What are you in the mood for?</p>
-          <div className="flex gap-1">
+          <div className="pill-row mood-row">
             {moods.map((m) => (
-              <div key={m}>
+              <div className="choice-pill" key={m}>
                 <input type="radio" name="mood" id={m} required value={m} />
-                <label htmlFor={m}>{m.charAt(0).toUpperCase()}</label>
+                <label htmlFor={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</label>
               </div>
             ))}
           </div>
-        </div>
-        <div className="flex flex-col gap-1">
+        </fieldset>
+        <div className="question-block">
           <label htmlFor="favPerson">
             Which famous film person would you love to be stranded on an island
             with and why?
           </label>
-          <input type="text" name="favPerson" id="favPerson" required />
+          <textarea
+            className="form-control text-area"
+            name="favPerson"
+            id="favPerson"
+            required
+          />
         </div>
-        <button type="submit">{isLast ? "Get Movies" : "Next Person"}</button>
+        <button type="submit" className="primary-button prefs-button">
+          {isLast ? "Get Movie" : "Next Person"}
+        </button>
       </form>
     </div>
   );
