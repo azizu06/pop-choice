@@ -1,11 +1,13 @@
 import { loadEnvConfig } from "@next/env";
-loadEnvConfig(process.cwd());
 import { readFile } from "node:fs/promises";
-import { supabase } from "@/lib/supabase";
-import { splitter } from "@/lib/splitter";
-import { createEmbedding } from "@/lib/movieRecs";
+
+loadEnvConfig(process.cwd());
 
 const seedData = async (document: string) => {
+  const { supabase } = await import("../lib/supabase");
+  const { splitter } = await import("../lib/splitter");
+  const { createEmbedding } = await import("../lib/movieRecs");
+
   const data = await readFile(document, "utf-8");
   const sections = data.trim().split("\n\n");
   const movieGroups = await Promise.all(
@@ -20,7 +22,7 @@ const seedData = async (document: string) => {
         chunks.map(async (chunk) => {
           return {
             title,
-            releaseYear,
+            release_year: releaseYear,
             content: chunk.pageContent,
             embedding: await createEmbedding(chunk.pageContent),
           };
@@ -33,7 +35,8 @@ const seedData = async (document: string) => {
   const { error } = await supabase.from("pop_choice").insert(movies);
   if (error) throw error;
 };
-seedData("movies.txt").catch((error) => {
+
+seedData("data/movies.txt").catch((error) => {
   console.error(error);
   process.exit(1);
 });
