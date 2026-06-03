@@ -13,6 +13,7 @@ export default function Home() {
   const [recs, setRecs] = useState<Movie[]>([]);
   const [prefIdx, setPrefIdx] = useState(1);
   const [recIdx, setRecIdx] = useState(0);
+  const curMovie = recs[recIdx];
   const handleSetup = (data: Session) => {
     setSession(data);
     setStep("prefs");
@@ -28,6 +29,7 @@ export default function Home() {
     startTransition(async () => {
       const movies = await getMovieRecs(session, allPrefs);
       setRecs(movies);
+      setPrefs(allPrefs);
       setStep("results");
     });
   };
@@ -36,7 +38,7 @@ export default function Home() {
     setPrefs([]);
     setRecs([]);
     setRecIdx(0);
-    setPrefIdx(0);
+    setPrefIdx(1);
     setStep("setup");
   };
   const nextMovie = () => {
@@ -50,16 +52,30 @@ export default function Home() {
         <PrefForm
           handleSubmit={handlePrefs}
           isLast={prefIdx === session?.peopleCount}
+          isPending={isPending}
           prefIdx={prefIdx}
         />
       )}
-      {step === "results" && (
+      {step === "results" && curMovie && (
         <MoviePage
           nextMovie={nextMovie}
-          movie={recs[recIdx]}
+          movie={curMovie}
           isLast={recs.length - 1 === recIdx}
-          isPending={isPending}
         />
+      )}
+      {step === "results" && !curMovie && (
+        <div className="screen empty-screen">
+          <section className="empty-info">
+            <h1 className="movie-title">No movies found</h1>
+            <p className="movie-copy empty-copy">
+              Try adjusting the group preferences so PopChoice has more to work
+              with.
+            </p>
+          </section>
+          <button className="primary-button movie-button" onClick={resetAll}>
+            Reset
+          </button>
+        </div>
       )}
     </main>
   );

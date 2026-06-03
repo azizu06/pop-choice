@@ -5,12 +5,14 @@ import { Preferences, PreferencesSchema } from "@/lib/schemas";
 export type PrefFormProps = {
   handleSubmit: (data: Preferences) => void;
   isLast: boolean;
+  isPending: boolean;
   prefIdx: number;
 };
 
 export default function PrefForm({
   handleSubmit,
   isLast,
+  isPending,
   prefIdx,
 }: PrefFormProps) {
   const types = ["new", "classic"];
@@ -81,8 +83,12 @@ export default function PrefForm({
             required
           />
         </div>
-        <button type="submit" className="primary-button prefs-button">
-          {isLast ? "Get Movie" : "Next Person"}
+        <button
+          type="submit"
+          className="primary-button prefs-button"
+          disabled={isPending}
+        >
+          {isPending ? "Generating..." : isLast ? "Get Movie" : "Next Person"}
         </button>
       </form>
     </div>

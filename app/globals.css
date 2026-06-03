@@ -266,6 +266,18 @@ button {
   bottom: 50px;
 }
 
+.empty-screen {
+  padding: 270px 33px 50px;
+}
+
+.empty-info {
+  width: 326px;
+}
+
+.empty-copy {
+  text-align: center;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
