@@ -20,7 +20,8 @@ Pop-Choice is a **Next.js 16 App Router** application that recommends movies to 
 | AI – Completions | OpenAI `gpt-5-nano` via `openai.responses.create` | same |
 | Vector DB | Supabase (pgvector RPC) | ^2.106.2 |
 | Poster API | TMDB | — |
-| Text Splitting | LangChain `RecursiveCharacterTextSplitter` | langchain ^1.4.2 |
+| Text Splitting | LangChain `RecursiveCharacterTextSplitter` | @langchain/textsplitters ^1.0.1 |
+| Rate Limiting | Upstash Ratelimit + Redis | @upstash/ratelimit ^2, @upstash/redis ^1 |
 | Scripts | `tsx` | ^4.22.4 |
 | Language | TypeScript (strict, ES2017 target) | ^5 |
 
@@ -50,10 +51,11 @@ pop-choice/
 │   ├── supabase.ts       # Supabase client singleton
 │   ├── tmdb.ts           # TMDB poster lookup
 │   ├── instructions.ts   # System prompt string for the AI
-│   └── splitter.ts       # LangChain splitter config (used by seed script)
+│   ├── splitter.ts       # LangChain splitter config (used by seed script)
+│   └── ratelimit.ts      # Upstash Redis rate limiter singleton (10 req/60 s per IP)
 │
 ├── scripts/
-│   └── seedMovies.ts     # One-time DB seed: parse movies.txt → embed → upsert
+│   └── seedMovies.ts     # One-time DB seed: parse movies.txt → embed → insert
 │
 ├── data/
 │   └── movies.txt        # 40+ films with title, year, rating, runtime, synopsis
@@ -80,6 +82,8 @@ OPENAI_API_KEY=            # Required for embeddings and chat completions
 NEXT_PUBLIC_SUPABASE_URL=  # Supabase project URL (exposed to browser)
 SUPABASE_API_KEY=          # Supabase service role key (server-only)
 TMDB_TOKEN=                # TMDB bearer token for poster search
+UPSTASH_REDIS_REST_URL=    # Upstash Redis REST URL (rate limiting; optional in dev)
+UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis REST token (rate limiting; optional in dev)
 ```
 
 `NEXT_PUBLIC_SUPABASE_URL` is the only variable safe to expose to the browser. All others must remain server-side only.
@@ -100,7 +104,7 @@ The seed script (`scripts/seedMovies.ts`) is a one-time operation that:
 1. Reads and parses `data/movies.txt`
 2. Chunks descriptions with LangChain (`chunkSize: 500`, `overlap: 75`)
 3. Calls OpenAI to embed each chunk
-4. Upserts rows into the `pop_choice` Supabase table
+4. Inserts rows into the `pop_choice` Supabase table (not idempotent — re-running will duplicate existing rows)
 
 ---
 
@@ -150,7 +154,11 @@ Always import types from here. Do not duplicate type definitions elsewhere.
 
 ### `app/actions.ts` — Server action boundary
 
-Thin wrapper around `getMovies`. This is the only server action. Do not add business logic here; keep it in `lib/movieRecs.ts`.
+Wraps `getMovies` with IP-based rate limiting (10 requests per 60 s per IP via Upstash Redis). Rate limiting is skipped when `UPSTASH_REDIS_REST_URL` is unset. Do not add other business logic here; keep it in `lib/movieRecs.ts`.
+
+### `lib/ratelimit.ts` — Upstash Redis rate limiter
+
+Exports a `ratelimit` singleton (or `null` when env vars are absent). Uses a sliding-window limiter: 10 requests per 60 seconds per IP. The `getMovieRecs` server action calls `ratelimit.limit(ip)` and returns `[]` on rejection.
 
 ### `app/globals.css` — All styling
 
@@ -221,4 +229,4 @@ This project uses **OpenAI SDK v6**, which differs from v4/v5:
 ## Adding New Movies
 
 1. Append entries to `data/movies.txt` following the existing format (Title, Year, Rating, Runtime, description)
-2. Re-run `npm run seed` to embed and upsert the new entries into Supabase
+2. Re-run `npm run seed` to embed and insert the new entries into Supabase (the script uses `.insert()`, not `.upsert()` — truncate the table first if re-seeding from scratch to avoid duplicate rows)
