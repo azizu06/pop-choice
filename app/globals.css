@@ -510,6 +510,11 @@ button {
   flex-direction: column;
 }
 
+.movie-screen.poster-pending {
+  animation: none;
+  opacity: 0;
+}
+
 .movie-info {
   width: 326px;
 }
