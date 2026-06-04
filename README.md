@@ -7,8 +7,8 @@ movie picks with posters and AI-written explanations.
 
 The project was built as a practical RAG/vector-search learning app: the UI is
 simple, but the backend flow uses real pieces you would use in production,
-including embeddings, vector similarity search, server actions, API-backed
-poster lookup, schema validation, and Redis-backed rate limiting.
+including embeddings, vector similarity search, a streaming API route,
+API-backed poster lookup, schema validation, and Redis-backed rate limiting.
 
 ## Preview
 
@@ -37,9 +37,16 @@ asset so the README can show the UI without calling OpenAI, Supabase, or TMDB.
 - Searches Supabase pgvector rows with a `match_popmovies` RPC.
 - Uses TMDB to fetch poster artwork for each matched movie.
 - Uses OpenAI Responses API to explain why each movie fits the group.
+- Streams recommendations back one at a time as each movie finishes processing.
 - Shows one movie at a time with a `Next Movie` / `Reset` flow.
+- Prevents duplicate recommendations when multiple retrieved chunks belong to
+  the same movie.
+- Holds the last streamed movie in a loading state until the stream finishes, so
+  `Reset` only appears when the full recommendation set is complete.
+- Keeps result cards hidden until the poster image has loaded.
+- Uses smooth transitions between setup, preference, loading, and result screens.
 - Handles no-match and rate-limit states with styled fallback screens.
-- Protects the recommendation action with Upstash Redis rate limiting.
+- Protects the recommendation API route with Upstash Redis rate limiting.
 
 ## Built With
 
@@ -63,29 +70,29 @@ asset so the README can show the UI without calling OpenAI, Supabase, or TMDB.
 ```mermaid
 flowchart TD
   A["Session form"] --> B["Preference form per person"]
-  B --> C["Server action: getMovieRecs"]
+  B --> C["POST /api/recs"]
   C --> D["Rate limit with Upstash Redis"]
   D --> E["Create OpenAI embedding"]
   E --> F["Supabase pgvector RPC"]
-  F --> G["Fetch poster from TMDB"]
-  F --> H["Generate explanation with OpenAI"]
-  G --> I["Movie result screen"]
-  H --> I
+  F --> G["Parallel poster + explanation jobs"]
+  G --> H["Stream one movie JSON line at a time"]
+  H --> I["Movie result screen"]
 ```
 
 The main flow lives in [app/page.tsx](app/page.tsx). The page keeps track of the
 current step, accumulated preferences, generated recommendations, and current
-movie index.
+movie index. It reads the streamed response from `/api/recs` and appends each
+movie as it arrives.
 
-The server action lives in [app/actions.ts](app/actions.ts). It rate-limits the
-request and then calls the core recommendation pipeline in
-[lib/movieRecs.ts](lib/movieRecs.ts).
+The recommendation route lives in [app/api/recs/route.ts](app/api/recs/route.ts).
+It rate-limits the request, validates the payload with Zod, then streams results
+from the core recommendation pipeline in [lib/movieRecs.ts](lib/movieRecs.ts).
 
 ## Project Structure
 
 ```text
 app/
-  actions.ts        Server action boundary and rate-limit check
+  api/recs/route.ts Streaming recommendation API route and rate-limit check
   globals.css       App styling, layout, animation, and screen system
   layout.tsx        Root layout and fonts
   page.tsx          Client-side wizard state machine
@@ -97,7 +104,7 @@ components/
 
 lib/
   instructions.ts   System prompt for movie explanations
-  movieRecs.ts      Embedding, vector search, poster lookup, explanation flow
+  movieRecs.ts      Async generator: embed, search, enrich, and yield movies
   openai.ts         OpenAI client
   ratelimit.ts      Upstash Redis rate limiter
   schemas.ts        Zod schemas and shared TypeScript types
@@ -227,14 +234,14 @@ This makes the seed script safer to rerun after editing the source movie data.
    - current mood
    - favorite film person
 3. The final person clicks `Get Movie`.
-4. The app shows a loading screen while it runs the recommendation pipeline.
-5. Recommendations appear one at a time.
+4. The app posts the group preferences to `/api/recs`.
+5. The route streams recommendations back as each poster/explanation pair is ready.
 6. Click `Next Movie` to move through matches.
 7. On the last movie, click `Reset` to start again.
 
 ## Rate Limiting
 
-The recommendation action is rate-limited with Upstash Redis:
+The recommendation API route is rate-limited with Upstash Redis:
 
 ```ts
 Ratelimit.slidingWindow(5, "6 h")
@@ -278,9 +285,25 @@ UPSTASH_REDIS_REST_TOKEN
 Only `NEXT_PUBLIC_SUPABASE_URL` should be public. All other values must stay
 server-side.
 
-The app is a good fit for Vercel because it uses Next.js App Router and Server
-Actions. Make sure the Supabase RPC and `pop_choice` table exist before trying
-the deployed recommendation flow.
+The app is deployed on Render:
+
+```text
+https://pop-choice-fgee.onrender.com
+```
+
+It is also deployed on Vercel:
+
+```text
+https://pop-choice-kappa.vercel.app
+```
+
+The Vercel deployment uses the same Next.js route handler. The recommendation
+route is configured for the Node.js runtime with a 60-second max duration because
+it performs multiple external calls while streaming results.
+
+Make sure the Supabase RPC and `pop_choice` table exist before trying either
+deployed recommendation flow. The deployed route at `/api/recs` should return a
+stream of newline-delimited movie JSON objects.
 
 ## What I Learned Building It
 
@@ -288,12 +311,13 @@ This project connects several concepts that usually appear separately:
 
 - client-side multi-step form state
 - Zod validation for browser `FormData`
-- server actions as the bridge between UI and backend work
+- streaming route handlers as the bridge between UI and backend work
 - OpenAI embeddings for semantic search
 - pgvector similarity search in Supabase
 - using retrieved context to generate concise natural-language explanations
 - external API enrichment with TMDB posters
 - Redis-backed rate limiting for deployment safety
+- progressive recommendation rendering with streamed results
 
 ## Future Improvements
 
