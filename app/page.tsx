@@ -11,6 +11,7 @@ import Popcorn from "@/public/popcorn.png";
 export default function Home() {
   const [step, setStep] = useState("setup");
   const [isPending, startTransition] = useTransition();
+  const [isScreenExiting, setIsScreenExiting] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [prefs, setPrefs] = useState<Preferences[]>([]);
   const [recs, setRecs] = useState<Movie[]>([]);
@@ -18,46 +19,66 @@ export default function Home() {
   const [prefIdx, setPrefIdx] = useState(1);
   const [recIdx, setRecIdx] = useState(0);
   const curMovie = recs[recIdx];
+  const screenTransitionMs = 170;
+
+  const changeScreen = (update: () => void) => {
+    if (isScreenExiting) return;
+    setIsScreenExiting(true);
+    window.setTimeout(() => {
+      update();
+      setIsScreenExiting(false);
+    }, screenTransitionMs);
+  };
 
   const handleSetup = (data: Session) => {
-    setSession(data);
-    setStep("prefs");
+    changeScreen(() => {
+      setSession(data);
+      setStep("prefs");
+    });
   };
 
   const handlePrefs = (data: Preferences) => {
-    if (!session) return;
+    if (!session || isScreenExiting) return;
     const allPrefs = [...prefs, data];
     if (allPrefs.length !== session.peopleCount) {
-      setPrefs(allPrefs);
-      setPrefIdx((prev) => prev + 1);
+      changeScreen(() => {
+        setPrefs(allPrefs);
+        setPrefIdx((prev) => prev + 1);
+      });
       return;
     }
-    startTransition(async () => {
-      const result = await getMovieRecs(session, allPrefs);
-      setRecs(result.movies);
-      setMessage(result.error ?? "");
-      setPrefs(allPrefs);
-      setStep("results");
+    changeScreen(() => {
+      startTransition(async () => {
+        const result = await getMovieRecs(session, allPrefs);
+        setRecs(result.movies);
+        setMessage(result.error ?? "");
+        setPrefs(allPrefs);
+        setStep("results");
+      });
     });
   };
 
   const resetAll = () => {
-    setSession(null);
-    setPrefs([]);
-    setRecs([]);
-    setMessage("");
-    setRecIdx(0);
-    setPrefIdx(1);
-    setStep("setup");
+    changeScreen(() => {
+      setSession(null);
+      setPrefs([]);
+      setRecs([]);
+      setMessage("");
+      setRecIdx(0);
+      setPrefIdx(1);
+      setStep("setup");
+    });
   };
 
   const nextMovie = () => {
     if (recIdx == recs.length - 1) return resetAll();
-    setRecIdx((prev) => prev + 1);
+    changeScreen(() => {
+      setRecIdx((prev) => prev + 1);
+    });
   };
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${isScreenExiting ? "is-screen-exiting" : ""}`}>
       {step === "setup" && <SessionForm handleSubmit={handleSetup} />}
 
       {step === "prefs" && !isPending && (
@@ -65,14 +86,14 @@ export default function Home() {
           key={prefIdx}
           handleSubmit={handlePrefs}
           isLast={prefIdx === session?.peopleCount}
-          isPending={isPending}
+          isPending={isPending || isScreenExiting}
           prefIdx={prefIdx}
           totalCount={session?.peopleCount ?? 1}
         />
       )}
 
       {isPending && (
-        <div className="screen loading-screen">
+        <div key="loading" className="screen loading-screen">
           <div className="loading-content">
             <Image
               src={Popcorn}
@@ -92,6 +113,7 @@ export default function Home() {
 
       {step === "results" && curMovie && (
         <MoviePage
+          key={`${recIdx}-${curMovie.title}`}
           nextMovie={nextMovie}
           movie={curMovie}
           isLast={recs.length - 1 === recIdx}
@@ -99,7 +121,7 @@ export default function Home() {
       )}
 
       {step === "results" && !curMovie && (
-        <div className="screen empty-screen">
+        <div key="empty" className="screen empty-screen">
           <section className="empty-info">
             <h1 className="movie-title">No matches found</h1>
             <p className="movie-copy empty-copy">
