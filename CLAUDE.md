@@ -52,10 +52,10 @@ pop-choice/
 │   ├── tmdb.ts           # TMDB poster lookup
 │   ├── instructions.ts   # System prompt string for the AI
 │   ├── splitter.ts       # LangChain splitter config (used by seed script)
-│   └── ratelimit.ts      # Upstash Redis rate limiter singleton (10 req/60 s per IP)
+│   └── ratelimit.ts      # Upstash Redis rate limiter singleton (5 req/hr per IP)
 │
 ├── scripts/
-│   └── seedMovies.ts     # One-time DB seed: parse movies.txt → embed → insert
+│   └── seedMovies.ts     # DB seed: parse movies.txt → embed → delete-then-insert (idempotent)
 │
 ├── data/
 │   └── movies.txt        # 40+ films with title, year, rating, runtime, synopsis
@@ -104,7 +104,7 @@ The seed script (`scripts/seedMovies.ts`) is a one-time operation that:
 1. Reads and parses `data/movies.txt`
 2. Chunks descriptions with LangChain (`chunkSize: 500`, `overlap: 75`)
 3. Calls OpenAI to embed each chunk
-4. Inserts rows into the `pop_choice` Supabase table (not idempotent — re-running will duplicate existing rows)
+4. Deletes existing rows for each movie title, then inserts fresh rows (idempotent — safe to re-run)
 
 ---
 
@@ -154,11 +154,11 @@ Always import types from here. Do not duplicate type definitions elsewhere.
 
 ### `app/actions.ts` — Server action boundary
 
-Wraps `getMovies` with IP-based rate limiting (10 requests per 60 s per IP via Upstash Redis). Rate limiting is skipped when `UPSTASH_REDIS_REST_URL` is unset. Do not add other business logic here; keep it in `lib/movieRecs.ts`.
+Wraps `getMovies` with IP-based rate limiting (5 requests per hour per IP via Upstash Redis). The rate-limit check is wrapped in a try/catch — if Upstash is unreachable the request is allowed through rather than crashing. IP is read from `x-forwarded-for`, falling back to `x-real-ip`, then `"anonymous"`. Rate limiting is skipped entirely when both Upstash env vars are absent. Do not add other business logic here; keep it in `lib/movieRecs.ts`.
 
 ### `lib/ratelimit.ts` — Upstash Redis rate limiter
 
-Exports a `ratelimit` singleton (or `null` when env vars are absent). Uses a sliding-window limiter: 10 requests per 60 seconds per IP. The `getMovieRecs` server action calls `ratelimit.limit(ip)` and returns `[]` on rejection.
+Exports a `ratelimit` singleton (or `null` when env vars are absent). Uses a sliding-window limiter: 5 requests per hour per IP. Guards creation on **both** `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — if only one is set the limiter stays null instead of constructing a broken Redis client.
 
 ### `app/globals.css` — All styling
 
@@ -229,4 +229,4 @@ This project uses **OpenAI SDK v6**, which differs from v4/v5:
 ## Adding New Movies
 
 1. Append entries to `data/movies.txt` following the existing format (Title, Year, Rating, Runtime, description)
-2. Re-run `npm run seed` to embed and insert the new entries into Supabase (the script uses `.insert()`, not `.upsert()` — truncate the table first if re-seeding from scratch to avoid duplicate rows)
+2. Re-run `npm run seed` — it deletes existing rows for those movie titles before inserting, so re-runs are safe

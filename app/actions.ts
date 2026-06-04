@@ -6,11 +6,15 @@ import { ratelimit } from "@/lib/ratelimit";
 
 export const getMovieRecs = async (session: Session, prefs: Preferences[]) => {
   if (ratelimit) {
-    const headersList = await headers();
-    const ip =
-      headersList.get("x-forwarded-for")?.split(",")[0].trim() ?? "anonymous";
-    const { success } = await ratelimit.limit(ip);
-    if (!success) return [];
+    try {
+      const headersList = await headers();
+      const forwarded = headersList.get("x-forwarded-for")?.split(",")[0].trim();
+      const ip = forwarded || headersList.get("x-real-ip") || "anonymous";
+      const { success } = await ratelimit.limit(ip);
+      if (!success) return [];
+    } catch {
+      // Upstash unavailable — degrade gracefully and allow the request
+    }
   }
   return getMovies(session, prefs);
 };
