@@ -5,7 +5,6 @@ import SessionForm from "@/components/sessionForm";
 import PrefForm from "@/components/prefForm";
 import MoviePage from "@/components/movie";
 import type { Preferences, Session, Movie } from "@/lib/schemas";
-import { getMovieRecs } from "./actions";
 import Popcorn from "@/public/popcorn.png";
 
 export default function Home() {
@@ -15,9 +14,9 @@ export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [prefs, setPrefs] = useState<Preferences[]>([]);
   const [recs, setRecs] = useState<Movie[]>([]);
-  const [message, setMessage] = useState("");
   const [prefIdx, setPrefIdx] = useState(1);
   const [recIdx, setRecIdx] = useState(0);
+  const [streaming, setStreaming] = useState(false);
   const curMovie = recs[recIdx];
   const screenTransitionMs = 170;
 
@@ -37,6 +36,25 @@ export default function Home() {
     });
   };
 
+  const readStream = async (res: Response) => {
+    const reader = res.body?.getReader();
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value);
+      const lines = buffer.split("\n");
+      buffer = lines.pop()!;
+      for (const line of lines) {
+        if (!line) continue;
+        const movie = JSON.parse(line);
+        setRecs((prev) => [...prev, movie]);
+      }
+    }
+  };
+
   const handlePrefs = (data: Preferences) => {
     if (!session || isScreenExiting) return;
     const allPrefs = [...prefs, data];
@@ -49,11 +67,16 @@ export default function Home() {
     }
     changeScreen(() => {
       startTransition(async () => {
-        const result = await getMovieRecs(session, allPrefs);
-        setRecs(result.movies);
-        setMessage(result.error ?? "");
-        setPrefs(allPrefs);
+        const response = await fetch("/api/recs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session, prefs: allPrefs }),
+        });
         setStep("results");
+        setStreaming(true);
+        await readStream(response);
+        setStreaming(false);
+        setPrefs(allPrefs);
       });
     });
   };
@@ -63,7 +86,6 @@ export default function Home() {
       setSession(null);
       setPrefs([]);
       setRecs([]);
-      setMessage("");
       setRecIdx(0);
       setPrefIdx(1);
       setStep("setup");
@@ -71,7 +93,10 @@ export default function Home() {
   };
 
   const nextMovie = () => {
-    if (recIdx == recs.length - 1) return resetAll();
+    if (recIdx == recs.length - 1) {
+      if (streaming) return;
+      return resetAll();
+    }
     changeScreen(() => {
       setRecIdx((prev) => prev + 1);
     });
@@ -92,7 +117,7 @@ export default function Home() {
         />
       )}
 
-      {isPending && (
+      {isPending && step !== "results" && (
         <div key="loading" className="screen loading-screen">
           <div className="loading-content">
             <Image
@@ -125,8 +150,7 @@ export default function Home() {
           <section className="empty-info">
             <h1 className="movie-title">No matches found</h1>
             <p className="movie-copy empty-copy">
-              {message ||
-                "Try adjusting the group preferences so PopChoice has more to work with."}
+              Try adjusting the group preferences so PopChoice has more to work with.
             </p>
           </section>
           <button className="primary-button movie-button" onClick={resetAll}>
