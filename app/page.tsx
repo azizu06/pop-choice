@@ -141,7 +141,8 @@ export default function Home() {
           key={`${recIdx}-${curMovie.title}`}
           nextMovie={nextMovie}
           movie={curMovie}
-          isLast={recs.length - 1 === recIdx}
+          isLast={!streaming && recs.length - 1 === recIdx}
+          isWaitingForMore={streaming && recs.length - 1 === recIdx}
         />
       )}
 

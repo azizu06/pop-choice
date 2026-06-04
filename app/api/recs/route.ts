@@ -3,6 +3,9 @@ import { getMovies } from "@/lib/movieRecs";
 import { RecBodySchema } from "@/lib/schemas";
 import { ratelimit } from "@/lib/ratelimit";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   try {
     const headersList = await headers();

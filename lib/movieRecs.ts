@@ -16,11 +16,14 @@ const findMatches = async (embedding: number[]) => {
   const { data, error } = await supabase.rpc("match_popmovies", {
     query_embedding: embedding,
     match_threshold: 0.3,
-    match_count: 5,
+    match_count: 12,
   });
   if (error) throw error;
   return data;
 };
+
+const getMovieKey = (movie: Pick<MovieMatch, "title" | "release_year">) =>
+  `${movie.title.trim().toLowerCase()}-${movie.release_year}`;
 
 const getChatCompletion = async (text: string, query: string) => {
   const input = `Context: ${text}\nQuery ${query}`;
@@ -54,7 +57,16 @@ export async function* getMovies(
   const embedding = await createEmbedding(input);
   const matches = await findMatches(embedding);
   if (!matches) return;
-  const pending = matches.map((m: MovieMatch) =>
+  const seen = new Set<string>();
+  const uniqueMatches = matches
+    .filter((match: MovieMatch) => {
+      const key = getMovieKey(match);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 5);
+  const pending = uniqueMatches.map((m: MovieMatch) =>
     Promise.all([
       getPosterUrl(m.title, m.release_year),
       getChatCompletion(m.content, input),
