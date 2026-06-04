@@ -1,36 +1,296 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PopChoice
+
+PopChoice is a Next.js movie recommendation app for groups. It asks how many
+people are watching, collects each person's preferences, searches a Supabase
+pgvector movie database with an OpenAI embedding, and returns a small set of
+movie picks with posters and AI-written explanations.
+
+The project was built as a practical RAG/vector-search learning app: the UI is
+simple, but the backend flow uses real pieces you would use in production,
+including embeddings, vector similarity search, server actions, API-backed
+poster lookup, schema validation, and Redis-backed rate limiting.
+
+## Preview
+
+| Start | Preferences | Recommendation |
+|---|---|---|
+| ![PopChoice start screen](docs/images/pop-choice-start.png) | ![PopChoice preferences screen](docs/images/pop-choice-preferences.png) | ![PopChoice recommendation screen](docs/images/pop-choice-results.png) |
+
+The recommendation preview uses the app's result layout with the fallback poster
+asset so the README can show the UI without calling OpenAI, Supabase, or TMDB.
+
+## What It Does
+
+- Collects a viewing session: group size and available time.
+- Loops through a preference form for each person in the group.
+- Combines all preferences into one semantic search query.
+- Creates an OpenAI embedding from the group preference summary.
+- Searches Supabase pgvector rows with a `match_popmovies` RPC.
+- Uses TMDB to fetch poster artwork for each matched movie.
+- Uses OpenAI Responses API to explain why each movie fits the group.
+- Shows one movie at a time with a `Next Movie` / `Reset` flow.
+- Handles no-match and rate-limit states with styled fallback screens.
+- Protects the recommendation action with Upstash Redis rate limiting.
+
+## Built With
+
+| Area | Tech |
+|---|---|
+| App framework | Next.js 16 App Router |
+| UI | React 19 |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 plus custom CSS in `app/globals.css` |
+| Validation | Zod |
+| Embeddings | OpenAI `text-embedding-3-small` |
+| AI response | OpenAI Responses API with `gpt-5-nano` |
+| Vector database | Supabase Postgres + pgvector |
+| Movie posters | TMDB Search API |
+| Text chunking | LangChain `RecursiveCharacterTextSplitter` |
+| Rate limiting | Upstash Redis + `@upstash/ratelimit` |
+| Seed script runtime | `tsx` |
+
+## How It Works
+
+```mermaid
+flowchart TD
+  A["Session form"] --> B["Preference form per person"]
+  B --> C["Server action: getMovieRecs"]
+  C --> D["Rate limit with Upstash Redis"]
+  D --> E["Create OpenAI embedding"]
+  E --> F["Supabase pgvector RPC"]
+  F --> G["Fetch poster from TMDB"]
+  F --> H["Generate explanation with OpenAI"]
+  G --> I["Movie result screen"]
+  H --> I
+```
+
+The main flow lives in [app/page.tsx](app/page.tsx). The page keeps track of the
+current step, accumulated preferences, generated recommendations, and current
+movie index.
+
+The server action lives in [app/actions.ts](app/actions.ts). It rate-limits the
+request and then calls the core recommendation pipeline in
+[lib/movieRecs.ts](lib/movieRecs.ts).
+
+## Project Structure
+
+```text
+app/
+  actions.ts        Server action boundary and rate-limit check
+  globals.css       App styling, layout, animation, and screen system
+  layout.tsx        Root layout and fonts
+  page.tsx          Client-side wizard state machine
+
+components/
+  sessionForm.tsx   First form: people count and available time
+  prefForm.tsx      Repeated preference form for each person
+  movie.tsx         Recommendation result card/screen
+
+lib/
+  instructions.ts   System prompt for movie explanations
+  movieRecs.ts      Embedding, vector search, poster lookup, explanation flow
+  openai.ts         OpenAI client
+  ratelimit.ts      Upstash Redis rate limiter
+  schemas.ts        Zod schemas and shared TypeScript types
+  splitter.ts       LangChain splitter config for seed data
+  supabase.ts       Supabase client
+  tmdb.ts           TMDB poster search helper
+
+scripts/
+  seedMovies.ts     Reads movie text data, chunks it, embeds it, and inserts rows
+
+data/
+  movies.txt        Source movie data used by the seed script
+
+docs/images/
+  README preview screenshots
+```
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create `.env.local`:
+
+```env
+OPENAI_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_API_KEY=
+TMDB_TOKEN=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database Setup
 
-## Learn More
+The app expects a Supabase table named `pop_choice` with a pgvector embedding
+column. The embedding size should match `text-embedding-3-small`, which is
+`1536` dimensions by default.
 
-To learn more about Next.js, take a look at the following resources:
+Suggested table shape:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sql
+create extension if not exists vector;
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+create table pop_choice (
+  id bigint generated always as identity primary key,
+  title text not null,
+  release_year int4 not null,
+  content text not null,
+  embedding vector(1536) not null
+);
+```
 
-## Deploy on Vercel
+The recommendation search uses a Supabase RPC:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```sql
+create or replace function match_popmovies(
+  query_embedding vector(1536),
+  match_threshold float,
+  match_count int
+)
+returns table(
+  id bigint,
+  title text,
+  release_year int4,
+  content text,
+  similarity float
+)
+language sql
+as $$
+  select
+    pop_choice.id,
+    pop_choice.title,
+    pop_choice.release_year,
+    pop_choice.content,
+    1 - (pop_choice.embedding <=> query_embedding) as similarity
+  from pop_choice
+  where 1 - (pop_choice.embedding <=> query_embedding) > match_threshold
+  order by pop_choice.embedding <=> query_embedding
+  limit match_count;
+$$;
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Seeding Movies
+
+Movie source data lives in [data/movies.txt](data/movies.txt). To populate
+Supabase:
+
+```bash
+npm run seed
+```
+
+The seed script:
+
+1. Loads `.env.local` with `@next/env`.
+2. Reads `data/movies.txt`.
+3. Splits movie sections by blank lines.
+4. Parses each movie title and release year.
+5. Chunks each section with LangChain.
+6. Creates an OpenAI embedding for each chunk.
+7. Deletes existing rows for the same movie titles.
+8. Inserts fresh rows into `pop_choice`.
+
+This makes the seed script safer to rerun after editing the source movie data.
+
+## Usage
+
+1. Enter how many people are watching and how much time the group has.
+2. Each person answers the same preference questions:
+   - favorite movie and why
+   - new or classic
+   - current mood
+   - favorite film person
+3. The final person clicks `Get Movie`.
+4. The app shows a loading screen while it runs the recommendation pipeline.
+5. Recommendations appear one at a time.
+6. Click `Next Movie` to move through matches.
+7. On the last movie, click `Reset` to start again.
+
+## Rate Limiting
+
+The recommendation action is rate-limited with Upstash Redis:
+
+```ts
+Ratelimit.slidingWindow(5, "6 h")
+```
+
+That means each detected IP gets 5 recommendation requests per 6-hour sliding
+window. This is intentionally strict because each recommendation can call
+OpenAI, Supabase, and TMDB.
+
+The limiter reads these env vars through `Redis.fromEnv()`:
+
+```env
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+## Scripts
+
+```bash
+npm run dev      # Start local Next.js dev server
+npm run build    # Build for production
+npm run start    # Start production server after build
+npm run lint     # Run ESLint
+npm run seed     # Seed Supabase with embedded movie chunks
+```
+
+## Deployment Notes
+
+Before deploying, configure these environment variables in your hosting
+provider:
+
+```env
+OPENAI_API_KEY
+NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_API_KEY
+TMDB_TOKEN
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+```
+
+Only `NEXT_PUBLIC_SUPABASE_URL` should be public. All other values must stay
+server-side.
+
+The app is a good fit for Vercel because it uses Next.js App Router and Server
+Actions. Make sure the Supabase RPC and `pop_choice` table exist before trying
+the deployed recommendation flow.
+
+## What I Learned Building It
+
+This project connects several concepts that usually appear separately:
+
+- client-side multi-step form state
+- Zod validation for browser `FormData`
+- server actions as the bridge between UI and backend work
+- OpenAI embeddings for semantic search
+- pgvector similarity search in Supabase
+- using retrieved context to generate concise natural-language explanations
+- external API enrichment with TMDB posters
+- Redis-backed rate limiting for deployment safety
+
+## Future Improvements
+
+- Add automated tests for form flow and recommendation fallback states.
+- Add a typed Supabase client generated from the database schema.
+- Store richer movie metadata for filtering by runtime, genre, and rating.
+- Add swipe gestures on the recommendation screen.
+- Add a larger movie dataset.
+- Add a dedicated admin-only seed route or CLI confirmation prompt.
