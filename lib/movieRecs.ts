@@ -32,10 +32,10 @@ const getChatCompletion = async (text: string, query: string) => {
   return response.output_text;
 };
 
-export const getMovies = async (
+export async function* getMovies(
   session: Session,
   prefs: Preferences[],
-): Promise<Movie[]> => {
+): AsyncGenerator<Movie> {
   const allPrefs = prefs
     .map((p, i) => {
       return `
@@ -52,22 +52,27 @@ export const getMovies = async (
   ${allPrefs}
   `;
   const embedding = await createEmbedding(input);
-  try {
-    const matches = await findMatches(embedding);
-    if (!matches) return [];
-    const movies = await Promise.all(
-      matches.map(async (m: MovieMatch) => {
-        return {
-          title: m.title,
-          releaseYear: m.release_year,
-          posterUrl: await getPosterUrl(m.title, m.release_year),
-          explanation: await getChatCompletion(m.content, input),
-        };
-      }),
+  const matches = await findMatches(embedding);
+  if (!matches) return;
+  const pending = matches.map((m: MovieMatch) =>
+    Promise.all([
+      getPosterUrl(m.title, m.release_year),
+      getChatCompletion(m.content, input),
+    ]).then(([posterUrl, explanation]) => ({
+      title: m.title,
+      releaseYear: m.release_year,
+      posterUrl,
+      explanation,
+    })),
+  );
+
+  while (pending.length > 0) {
+    const winner = await Promise.race(
+      pending.map((p: Promise<Movie>, i: number) =>
+        p.then((movie: Movie) => ({ movie, i })),
+      ),
     );
-    return movies;
-  } catch (err) {
-    console.error(err);
-    return [];
+    yield winner.movie;
+    pending.splice(winner.i, 1);
   }
-};
+}

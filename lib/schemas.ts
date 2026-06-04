@@ -30,3 +30,8 @@ export type MovieMatch = {
   content: string;
   similarity: number;
 };
+
+export const RecBodySchema = z.object({
+  session: SessionSchema,
+  prefs: z.array(PreferencesSchema),
+});
