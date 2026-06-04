@@ -32,6 +32,12 @@ const seedData = async (document: string) => {
     }),
   );
   const movies = movieGroups.flat();
+  const titles = [...new Set(movies.map((m) => m.title))];
+  const { error: delError } = await supabase
+    .from("pop_choice")
+    .delete()
+    .in("title", titles);
+  if (delError) throw delError;
   const { error } = await supabase.from("pop_choice").insert(movies);
   if (error) throw error;
 };
