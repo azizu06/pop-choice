@@ -142,7 +142,7 @@ export default function Home() {
           nextMovie={nextMovie}
           movie={curMovie}
           isLast={!streaming && recs.length - 1 === recIdx}
-          isWaitingForMore={streaming && recs.length - 1 === recIdx}
+          stillMore={streaming && recs.length - 1 === recIdx}
         />
       )}
 
@@ -151,7 +151,8 @@ export default function Home() {
           <section className="empty-info">
             <h1 className="movie-title">No matches found</h1>
             <p className="movie-copy empty-copy">
-              Try adjusting the group preferences so PopChoice has more to work with.
+              Try adjusting the group preferences so PopChoice has more to work
+              with.
             </p>
           </section>
           <button className="primary-button movie-button" onClick={resetAll}>

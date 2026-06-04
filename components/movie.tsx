@@ -6,7 +6,7 @@ import { Movie } from "@/lib/schemas";
 export type MoviePageProps = {
   nextMovie: () => void;
   isLast: boolean;
-  isWaitingForMore: boolean;
+  stillMore: boolean;
   movie: Movie;
 };
 
@@ -14,7 +14,7 @@ export default function MoviePage({
   nextMovie,
   movie,
   isLast,
-  isWaitingForMore,
+  stillMore,
 }: MoviePageProps) {
   const [posterReady, setPosterReady] = useState(!movie.posterUrl);
 
@@ -39,10 +39,10 @@ export default function MoviePage({
       </section>
       <button
         className="primary-button movie-button"
-        disabled={isWaitingForMore}
+        disabled={stillMore}
         onClick={() => nextMovie()}
       >
-        {isWaitingForMore ? "Loading More..." : isLast ? "Reset" : "Next Movie"}
+        {stillMore ? "Loading More..." : isLast ? "Reset" : "Next Movie"}
       </button>
     </div>
   );
