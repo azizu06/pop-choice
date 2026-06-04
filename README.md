@@ -12,9 +12,18 @@ poster lookup, schema validation, and Redis-backed rate limiting.
 
 ## Preview
 
-| Start | Preferences | Recommendation |
-|---|---|---|
-| ![PopChoice start screen](docs/images/pop-choice-start.png) | ![PopChoice preferences screen](docs/images/pop-choice-preferences.png) | ![PopChoice recommendation screen](docs/images/pop-choice-results.png) |
+<table>
+  <tr>
+    <th>Start</th>
+    <th>Preferences</th>
+    <th>Recommendation</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/pop-choice-start.png" alt="PopChoice start screen" width="220" /></td>
+    <td><img src="docs/images/pop-choice-preferences.png" alt="PopChoice preferences screen" width="220" /></td>
+    <td><img src="docs/images/pop-choice-results.png" alt="PopChoice recommendation screen" width="220" /></td>
+  </tr>
+</table>
 
 The recommendation preview uses the app's result layout with the fallback poster
 asset so the README can show the UI without calling OpenAI, Supabase, or TMDB.
